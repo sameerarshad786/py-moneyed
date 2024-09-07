@@ -2,19 +2,16 @@ from __future__ import annotations
 
 import warnings
 from decimal import Decimal
-from typing import TYPE_CHECKING, TypeVar, overload
+from typing import TYPE_CHECKING, Protocol, TypeVar, cast, overload
 
 from babel import Locale
 from babel.core import get_global
-from typing_extensions import Protocol
 
 from .l10n import format_money, format_money_range
 from .utils import cached_property
 
 if TYPE_CHECKING:
-    from typing import Any, NoReturn
-
-    from typing_extensions import Final
+    from typing import Any, Final, NoReturn
 
 
 def force_decimal(amount: object) -> Decimal:
@@ -81,10 +78,13 @@ class Currency:
     def get_name(self, locale: str, count: int | None = None) -> str:
         from babel.numbers import get_currency_name
 
-        return get_currency_name(  # type: ignore[no-any-return]
-            self.code,
-            locale=locale,
-            count=count,
+        return cast(
+            "str",
+            get_currency_name(
+                self.code,
+                locale=locale,
+                count=count,
+            ),
         )
 
     @cached_property
@@ -161,8 +161,7 @@ M = TypeVar("M", bound="Money")
 
 
 class SupportsNeg(Protocol):
-    def __neg__(self) -> Any:
-        ...
+    def __neg__(self) -> Any: ...
 
 
 zero = Decimal("0.0")
@@ -184,12 +183,10 @@ class Money:
     # the implementation defines `None` as default for currency, but raises a TypeError
     # for that case.
     @overload
-    def __init__(self, amount: object = ..., *, currency: str | Currency) -> None:
-        ...
+    def __init__(self, amount: object = ..., *, currency: str | Currency) -> None: ...
 
     @overload
-    def __init__(self, amount: object, currency: str | Currency) -> None:
-        ...
+    def __init__(self, amount: object, currency: str | Currency) -> None: ...
 
     def __init__(
         self,
@@ -261,11 +258,18 @@ class Money:
                 warnings.warn(
                     "Multiplying Money instances with floats is deprecated",
                     DeprecationWarning,
+                    stacklevel=2,
                 )
             return self.__class__(
                 amount=(self.amount * force_decimal(other)),
                 currency=self.currency,
             )
+
+    @overload
+    def __truediv__(self: M, other: int | float | Decimal) -> M: ...
+
+    @overload
+    def __truediv__(self: M, other: Money) -> Decimal: ...
 
     def __truediv__(self: M, other: object) -> M | Decimal:
         if isinstance(other, Money):
@@ -277,6 +281,7 @@ class Money:
                 warnings.warn(
                     "Dividing Money instances by floats is deprecated",
                     DeprecationWarning,
+                    stacklevel=2,
                 )
             return self.__class__(
                 amount=(self.amount / force_decimal(other)),
@@ -323,6 +328,7 @@ class Money:
                 warnings.warn(
                     "Calculating percentages of Money instances using floats is deprecated",
                     DeprecationWarning,
+                    stacklevel=2,
                 )
             return self.__class__(
                 amount=(Decimal(str(other)) * self.amount / 100),
@@ -624,13 +630,11 @@ def add_currency(
 
 
 @overload
-def get_currency(code: str) -> Currency:
-    ...
+def get_currency(code: str) -> Currency: ...
 
 
 @overload
-def get_currency(*, iso: int | str) -> Currency:
-    ...
+def get_currency(*, iso: int | str) -> Currency: ...
 
 
 def get_currency(code: str | None = None, iso: int | str | None = None) -> Currency:
